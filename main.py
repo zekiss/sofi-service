@@ -2,6 +2,7 @@ import os
 import logging
 import platform
 import shutil
+import uvicorn
 from typing import Optional
 from fastapi import (
     FastAPI,
@@ -21,6 +22,8 @@ import subprocess
 from sofistik_connect import connect_to_cdb, close_cdb
 from read_truss_cdb import get_truss_results, get_node_results
 from read_plate_cdb import get_quad_forces_results
+
+#from api.sofistik import read_truss_cdb # TODO: Check if this import is actually unused
 
 # ----------- for socketio-------------------------------#
 import socketio
@@ -253,6 +256,8 @@ async def receive_dat(sid, message):
     # save received dat
     save_binary_tmp(binary, sid)
 
+    print("saved binary")
+
     await sio.sleep(1)
 
     # respond: DAT received
@@ -299,7 +304,69 @@ async def receive_dat(sid, message):
             room=sid,
         )
         await sio.disconnect(sid)
+    print(calculation_success, flush=True)
 
+
+@sio.on("send dat model update")
+async def receive_dat(sid, message):
+
+    sid_for_path = ''.join(e for e in sid if e.isalnum())
+
+    binary = message["file_data"]
+    viz_sid = message["viz_sid"]
+    print("IIIIIIIIIID" + viz_sid)
+
+    # save received dat
+    save_binary_tmp(binary, sid_for_path)
+
+    print("saved binary")
+
+    await sio.sleep(1)
+
+    # respond: DAT received
+    await sio.emit("message", 
+        {
+            "message": "Sofi-Service: DAT file recieved, starting the calculation",
+            "project_id": message["project_id"]
+        }, 
+        room=sid,
+        )
+
+    # start SOFiSTiK calculation and send back the CDB
+    calculation_success = await calculation_from_socketio(sid_for_path)
+    if calculation_success:
+        await sio.emit(
+            "message",
+            {
+                "message": "Sofi-Service: Calculation was successfull. I will send you the cdb now.",
+                "project_id": message["project_id"]
+            },
+            room=sid,
+        )
+        path_to_cdb = Path(f"dat/{sid_for_path}/{sid_for_path}.cdb")
+        with open(path_to_cdb, "rb") as f:
+            file_data = f.read()
+        await sio.emit(
+            "send file model update",
+            {
+                "file_data": file_data,
+                "viz_sid": viz_sid,
+                "frontend_sid": message["frontend_sid"],
+                "project_id": message["project_id"]
+            },
+            room=sid
+        )
+        await sio.disconnect(sid)
+    else:
+        await sio.emit(
+            "message",
+            {
+                "message": "Sofi-Service: ERROR - calculation not successful.",
+                "project_id": message["project_id"]
+            },
+            room=sid,
+        )
+        await sio.disconnect(sid)
     print(calculation_success, flush=True)
 
 
@@ -323,3 +390,5 @@ async def disconnect(sid):
 
 app.mount("/", socket_app)
 
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port="8011")
