@@ -23,8 +23,9 @@ install-conda: ## install requirements with conda, be sure to have the right vir
  	--file requirements.txt
 .PHONY: install-conda
 
-up:  ## Set-up services and start on localhost and port 8001
-	uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+up:  ## Set-up services and start on localhost and port 8011 --reload flag has been removed
+	uvicorn main:app --host 0.0.0.0 --port 8011 
+	
 
 .PHONY: up
 
