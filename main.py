@@ -284,10 +284,11 @@ async def receive_dat(sid, message):
         with open(path_to_cdb, "rb") as f:
             file_data = f.read()
         await sio.emit(
-            "send file",
+            "send file", # Gets sent to ModelCreation (sofi_socket.py)!
             {
                 "file_data": file_data,
                 "viz_sid": viz_sid,
+                "original_params": message["original_params"], # NEW, had been missing and used in sofi_socket!
                 "frontend_sid": message["frontend_sid"],
                 "project_id": message["project_id"]
             },
