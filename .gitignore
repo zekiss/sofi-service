@@ -3,9 +3,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+dat/
 # C extensions
 *.so
+Sofistik/
 
 # Distribution / packaging
 .Python
